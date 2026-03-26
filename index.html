@@ -129,6 +129,27 @@ position:relative;transition:transform .2s;
 .counter{text-align:center;margin:16px 0;font-size:.8rem;color:var(--text3)}
 .counter strong{color:var(--gold);font-family:'JetBrains Mono',monospace}
 
+/* AI PREDICTION CARD */
+.ai-divider-line{height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.3),transparent);margin:14px 0 8px}
+.ai-pred-card{
+background:linear-gradient(135deg,rgba(139,92,246,.06),rgba(245,158,11,.04));
+border:1px solid rgba(139,92,246,.25);border-radius:14px;
+padding:16px;margin-bottom:10px;position:relative;overflow:hidden;
+}
+.ai-pred-card::before{
+content:'';position:absolute;top:0;left:0;right:0;height:2px;
+background:linear-gradient(90deg,#8b5cf6,#f59e0b,#ec4899,#8b5cf6);
+background-size:300% 100%;animation:ai-shine 4s linear infinite;
+}
+@keyframes ai-shine{0%{background-position:300% 0}100%{background-position:-300% 0}}
+.ai-pred-card:hover{border-color:rgba(139,92,246,.4)}
+.ai-badge{
+display:inline-flex;align-items:center;gap:5px;font-size:.65rem;
+padding:3px 10px;border-radius:12px;font-weight:700;
+background:rgba(139,92,246,.15);color:#c4b5fd;border:1px solid rgba(139,92,246,.2);
+}
+.ai-kolon-num{font-size:.8rem;font-weight:700;color:#c4b5fd;display:flex;align-items:center;gap:5px}
+
 /* DISCLAIMER */
 .disclaimer{
 background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);
@@ -445,6 +466,92 @@ function genOn(strat) {
   return { nums, label };
 }
 
+// ============ YAPAY ZEKA TAHMİN FONKSİYONLARI ============
+// Strateji: Her sayı aralığını eşit segmentlere böl, her segmentten
+// en yüksek frekanslı sayıyı seç → hem dengeli hem sıcak sayı karması
+
+function genAISayisal() {
+  const max=90, count=6;
+  const maxFreq = Math.max(...Object.values(sayisalFreq));
+  const scores = {};
+  for(let n=1;n<=max;n++) scores[n] = maxFreq>0 ? sayisalFreq[n]/maxFreq : 0;
+
+  const segSize = Math.floor(max/count); // 15
+  const nums = [];
+  for(let s=0;s<count;s++){
+    const lo = s*segSize+1;
+    const hi = s===count-1 ? max : (s+1)*segSize;
+    const seg = [];
+    for(let n=lo;n<=hi;n++) seg.push(n);
+    seg.sort((a,b)=>scores[b]-scores[a]);
+    const top = seg.slice(0,Math.min(3,seg.length));
+    nums.push(top[Math.floor(Math.random()*top.length)]);
+  }
+  nums.sort((a,b)=>a-b);
+
+  // Tek/çift dengesi
+  const odds = nums.filter(n=>n%2!==0).length;
+  if(odds===0||odds===6){
+    const idx = Math.floor(Math.random()*count);
+    let nn; do{ nn=1+Math.floor(Math.random()*max); }while(nums.includes(nn));
+    nums[idx]=nn; nums.sort((a,b)=>a-b);
+  }
+
+  // Joker: sıcak sayılar içinden nums'ta olmayan birini seç
+  const hot = getHot(sayisalFreq, 30);
+  const joker = hot.find(n=>!nums.includes(n)) || (1+Math.floor(Math.random()*90));
+  return { nums, joker };
+}
+
+function genAISans() {
+  const max=34, count=5, plusMax=14;
+  const maxFreq = Math.max(...Object.values(sansFreq));
+  const scores = {};
+  for(let n=1;n<=max;n++) scores[n] = maxFreq>0 ? sansFreq[n]/maxFreq : 0;
+
+  const segSize = Math.floor(max/count);
+  const nums = [];
+  for(let s=0;s<count;s++){
+    const lo = s*segSize+1;
+    const hi = s===count-1 ? max : (s+1)*segSize;
+    const seg = [];
+    for(let n=lo;n<=hi;n++) seg.push(n);
+    seg.sort((a,b)=>scores[b]-scores[a]);
+    const top = seg.slice(0,Math.min(3,seg.length));
+    nums.push(top[Math.floor(Math.random()*top.length)]);
+  }
+  nums.sort((a,b)=>a-b);
+
+  // Plus: en sık çekilen 3 plus içinden birini seç
+  const plusArr = [];
+  for(let n=1;n<=plusMax;n++) plusArr.push([n, sansPlusFreq[n]||0]);
+  plusArr.sort((a,b)=>b[1]-a[1]);
+  const topPlus = plusArr.slice(0,3);
+  const plus = topPlus[Math.floor(Math.random()*topPlus.length)][0];
+  return { nums, plus };
+}
+
+function genAIOn() {
+  const max=80, count=10;
+  const maxFreq = Math.max(...Object.values(onFreq));
+  const scores = {};
+  for(let n=1;n<=max;n++) scores[n] = maxFreq>0 ? onFreq[n]/maxFreq : 0;
+
+  const segSize = Math.floor(max/count); // 8
+  const nums = [];
+  for(let s=0;s<count;s++){
+    const lo = s*segSize+1;
+    const hi = s===count-1 ? max : (s+1)*segSize;
+    const seg = [];
+    for(let n=lo;n<=hi;n++) seg.push(n);
+    seg.sort((a,b)=>scores[b]-scores[a]);
+    const top = seg.slice(0,Math.min(3,seg.length));
+    nums.push(top[Math.floor(Math.random()*top.length)]);
+  }
+  nums.sort((a,b)=>a-b);
+  return { nums };
+}
+
 // ============ ANA ÜRETİCİ ============
 function generate() {
   const resultsEl = document.getElementById('results');
@@ -508,7 +615,33 @@ function generate() {
   });
   
   html += `</div>`;
-  
+
+  // AI Tahmin Kolonu
+  let ai;
+  if(currentGame==='sayisal') ai = genAISayisal();
+  else if(currentGame==='sans') ai = genAISans();
+  else ai = genAIOn();
+
+  html += `<div class="ai-divider-line"></div>`;
+  html += `<div class="ai-pred-card" data-game="${currentGame}">`;
+  html += `<div class="kolon-head">`;
+  html += `<span class="ai-kolon-num">🤖 Ben Olsaydım</span>`;
+  html += `<span class="ai-badge">✨ Yapay Zeka Tahmini</span>`;
+  html += `</div>`;
+  html += `<div class="balls">`;
+  if(currentGame==='sayisal'){
+    ai.nums.forEach(n => html+=`<div class="ball main">${n}</div>`);
+    html+=`<span class="ball-sep">J</span><div class="ball joker">${ai.joker}</div>`;
+  } else if(currentGame==='sans'){
+    ai.nums.forEach(n => html+=`<div class="ball sans-main">${n}</div>`);
+    html+=`<span class="ball-sep">+</span><div class="ball sans-plus">${ai.plus}</div>`;
+  } else {
+    ai.nums.forEach(n => html+=`<div class="ball on-num">${n}</div>`);
+  }
+  html += `</div></div>`;
+
+  html += `</div>`;
+
   resultsEl.insertAdjacentHTML('afterbegin', html);
   
   document.getElementById('counter').innerHTML = `Toplam üretilen: <strong>${totalGenerated}</strong> kolon`;
