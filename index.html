@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sayı Matik Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#06080f;--surface:#0d1117;--card:#161b26;--card2:#1c2333;
+--border:#1e293b;--border2:#2d3748;
+--text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;
+--gold:#f59e0b;--gold2:#fbbf24;
+--cyan:#06b6d4;--cyan2:#22d3ee;
+--green:#10b981;--green2:#34d399;
+--red:#ef4444;--pink:#ec4899;--purple:#8b5cf6;--blue:#3b82f6;
+--orange:#f97316;
+}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* BACKGROUND EFFECTS */
+.bg-glow{position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,.06),transparent 70%);pointer-events:none;z-index:0}
+.bg-glow2{position:fixed;bottom:-300px;right:-100px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(245,158,11,.04),transparent 70%);pointer-events:none;z-index:0}
+
+.container{max-width:800px;margin:0 auto;padding:16px;position:relative;z-index:1}
+
+/* HEADER */
+header{text-align:center;padding:32px 0 24px;position:relative}
+.logo{font-size:2.6rem;font-weight:900;letter-spacing:-2px;line-height:1}
+.logo span{background:linear-gradient(135deg,var(--cyan),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:.85rem;color:var(--text3);margin-top:4px;font-weight:400;letter-spacing:1px}
+.version{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.65rem;font-weight:700;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.2);margin-top:8px;letter-spacing:1px}
+
+/* GAME SELECTOR */
+.game-selector{display:flex;gap:8px;margin:24px 0 20px;justify-content:center;flex-wrap:wrap}
+.game-btn{
+padding:14px 20px;border-radius:14px;border:2px solid var(--border);background:var(--card);
+color:var(--text2);cursor:pointer;font-family:inherit;font-size:.85rem;font-weight:700;
+transition:all .3s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden;
+display:flex;align-items:center;gap:8px;flex:1;min-width:140px;justify-content:center;
+}
+.game-btn::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s}
+.game-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.game-btn.active{color:#fff;border-color:transparent;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.game-btn[data-game="sayisal"].active{background:linear-gradient(135deg,#1e40af,#3b82f6);box-shadow:0 8px 24px rgba(59,130,246,.3)}
+.game-btn[data-game="sans"].active{background:linear-gradient(135deg,#047857,#10b981);box-shadow:0 8px 24px rgba(16,185,129,.3)}
+.game-btn[data-game="on"].active{background:linear-gradient(135deg,#0e7490,#06b6d4);box-shadow:0 8px 24px rgba(6,182,212,.3)}
+.game-icon{font-size:1.2rem}
+
+/* GAME INFO BAR */
+.game-info{
+background:var(--card);border:1px solid var(--border);border-radius:12px;
+padding:12px 16px;margin-bottom:20px;display:flex;justify-content:space-between;
+align-items:center;flex-wrap:wrap;gap:8px;font-size:.8rem;
+}
+.game-info .tag{padding:4px 12px;border-radius:20px;font-weight:700;font-size:.72rem;letter-spacing:.5px}
+
+/* STRATEGY SELECTOR */
+.strat-section{margin-bottom:20px}
+.strat-label{font-size:.8rem;color:var(--text3);margin-bottom:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.strat-grid{display:flex;gap:6px;flex-wrap:wrap}
+.strat-btn{
+padding:10px 16px;border-radius:10px;border:1px solid var(--border);background:var(--card);
+color:var(--text2);cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;
+transition:all .25s;display:flex;align-items:center;gap:6px;
+}
+.strat-btn:hover{background:var(--card2);border-color:var(--border2);color:var(--text)}
+.strat-btn.active{background:rgba(245,158,11,.1);border-color:var(--gold);color:var(--gold)}
+.strat-btn .dot{width:8px;height:8px;border-radius:50%}
+
+/* GENERATE BUTTON */
+.gen-wrap{text-align:center;margin:24px 0}
+.gen-btn{
+padding:16px 48px;border-radius:16px;border:none;cursor:pointer;font-family:inherit;
+font-size:1.1rem;font-weight:800;letter-spacing:.5px;position:relative;overflow:hidden;
+transition:all .3s cubic-bezier(.4,0,.2,1);color:#000;
+background:linear-gradient(135deg,var(--gold),var(--gold2),var(--orange));
+box-shadow:0 4px 20px rgba(245,158,11,.3);
+}
+.gen-btn:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(245,158,11,.4)}
+.gen-btn:active{transform:translateY(-1px) scale(.98)}
+.gen-btn .shimmer{
+position:absolute;top:0;left:-100%;width:50%;height:100%;
+background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+animation:shimmer 2.5s infinite;
+}
+@keyframes shimmer{0%{left:-100%}100%{left:200%}}
+
+/* RESULTS */
+.results{margin-top:8px}
+.result-batch{margin-bottom:24px;animation:slideUp .5s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.batch-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.batch-time{font-size:.75rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.batch-strat{font-size:.72rem;padding:3px 10px;border-radius:20px;font-weight:600}
+
+.kolon-card{
+background:var(--card);border:1px solid var(--border);border-radius:14px;
+padding:16px;margin-bottom:10px;position:relative;overflow:hidden;
+transition:all .3s;
+}
+.kolon-card:hover{border-color:var(--border2);background:var(--card2)}
+.kolon-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kolon-card[data-game="sayisal"]::before{background:linear-gradient(90deg,#3b82f6,#8b5cf6)}
+.kolon-card[data-game="sans"]::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.kolon-card[data-game="on"]::before{background:linear-gradient(90deg,#06b6d4,#22d3ee)}
+
+.kolon-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.kolon-num{font-size:.8rem;font-weight:700;color:var(--text2)}
+.kolon-type{font-size:.65rem;padding:3px 8px;border-radius:12px;font-weight:600}
+
+.balls{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ball{
+width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+font-weight:800;font-size:.85rem;font-family:'JetBrains Mono',monospace;
+position:relative;transition:transform .2s;
+}
+.ball:hover{transform:scale(1.15)}
+.ball.main{background:linear-gradient(145deg,#1e40af,#3b82f6);color:#fff;box-shadow:0 3px 10px rgba(59,130,246,.3)}
+.ball.joker{background:linear-gradient(145deg,#b91c1c,#ef4444);color:#fff;box-shadow:0 3px 10px rgba(239,68,68,.3)}
+.ball.star{background:linear-gradient(145deg,#b45309,#f59e0b);color:#000;box-shadow:0 3px 10px rgba(245,158,11,.3)}
+.ball.sans-main{background:linear-gradient(145deg,#047857,#10b981);color:#fff;box-shadow:0 3px 10px rgba(16,185,129,.3)}
+.ball.sans-plus{background:linear-gradient(145deg,#6d28d9,#8b5cf6);color:#fff;box-shadow:0 3px 10px rgba(139,92,246,.3)}
+.ball.on-num{background:linear-gradient(145deg,#0e7490,#06b6d4);color:#fff;box-shadow:0 3px 10px rgba(6,182,212,.25)}
+.ball-sep{color:var(--text3);font-size:.75rem;font-weight:600;margin:0 2px}
+
+/* COUNTER */
+.counter{text-align:center;margin:16px 0;font-size:.8rem;color:var(--text3)}
+.counter strong{color:var(--gold);font-family:'JetBrains Mono',monospace}
+
+/* DISCLAIMER */
+.disclaimer{
+background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);
+border-radius:10px;padding:12px 16px;margin-top:20px;font-size:.75rem;color:var(--text3);line-height:1.6;text-align:center;
+}
+
+/* HISTORY TOGGLE */
+.history-toggle{
+display:flex;justify-content:center;margin:16px 0;
+}
+.hist-btn{
+padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);
+color:var(--text3);cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;
+transition:all .2s;
+}
+.hist-btn:hover{color:var(--text);border-color:var(--border2)}
+
+@media(max-width:600px){
+.container{padding:10px}
+.logo{font-size:2rem}
+.game-btn{padding:12px 14px;font-size:.78rem;min-width:110px}
+.ball{width:32px;height:32px;font-size:.75rem}
+.gen-btn{padding:14px 36px;font-size:1rem}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+<div class="bg-glow2"></div>
+
+<div class="container">
+
+<header>
+  <div class="logo"><span>SAYI MATİK</span></div>
+  <div class="logo-sub">Akıllı Loto Sayı Üretici</div>
+  <div class="version">PRO v1.0</div>
+</header>
+
+<!-- GAME SELECTOR -->
+<div class="game-selector">
+  <button class="game-btn active" data-game="sayisal" onclick="selectGame('sayisal')">
+    <span class="game-icon">🎰</span> Sayısal Loto
+  </button>
+  <button class="game-btn" data-game="sans" onclick="selectGame('sans')">
+    <span class="game-icon">🎱</span> Şans Topu
+  </button>
+  <button class="game-btn" data-game="on" onclick="selectGame('on')">
+    <span class="game-icon">🔟</span> On Numara
+  </button>
+</div>
+
+<!-- GAME INFO -->
+<div class="game-info" id="game-info">
+  <div><strong id="info-name">Çılgın Sayısal Loto</strong></div>
+  <div id="info-detail" style="color:var(--text2)">1-90 arası 6 sayı + Joker</div>
+  <div id="info-tag"><span class="tag" style="background:rgba(59,130,246,.1);color:#93c5fd">Pzt-Çar-Cmt 21:30</span></div>
+</div>
+
+<!-- STRATEGY -->
+<div class="strat-section">
+  <div class="strat-label">Strateji Seçimi</div>
+  <div class="strat-grid" id="strat-grid">
+    <button class="strat-btn active" data-strat="auto" onclick="selectStrat('auto')">
+      <div class="dot" style="background:var(--gold)"></div> Otomatik Karma
+    </button>
+    <button class="strat-btn" data-strat="hot" onclick="selectStrat('hot')">
+      <div class="dot" style="background:var(--red)"></div> Sıcak Sayılar
+    </button>
+    <button class="strat-btn" data-strat="cold" onclick="selectStrat('cold')">
+      <div class="dot" style="background:var(--blue)"></div> Soğuk Sayılar
+    </button>
+    <button class="strat-btn" data-strat="balanced" onclick="selectStrat('balanced')">
+      <div class="dot" style="background:var(--green)"></div> Dengeli Dağılım
+    </button>
+    <button class="strat-btn" data-strat="random" onclick="selectStrat('random')">
+      <div class="dot" style="background:var(--purple)"></div> Tam Rastgele
+    </button>
+  </div>
+</div>
+
+<!-- GENERATE -->
+<div class="gen-wrap">
+  <button class="gen-btn" onclick="generate()">
+    <span class="shimmer"></span>
+    KOLON ÜRET ⚡
+  </button>
+</div>
+
+<div class="counter" id="counter"></div>
+
+<!-- RESULTS -->
+<div class="results" id="results"></div>
+
+<div class="disclaimer">
+  ⚠️ Loto tamamen şansa dayalıdır. Bu uygulama istatistiksel eğilimleri kullanır ancak <strong>kazanmayı garanti etmez.</strong> Sorumlu oynayın, bütçenizi aşmayın.
+</div>
+
+</div>
+
+<script>
+// ============ VERİ TABANLARI ============
+
+// Sayısal Loto son çekilişler (Mart 2026)
+const sayisalDraws = [
+  [14,19,40,41,43,78],[20,28,31,45,67,68],[6,13,26,47,67,71],
+  [10,12,35,53,55,86],[23,38,47,61,78,83],[24,32,40,43,46,77],
+  [24,29,52,57,64,71],[7,23,38,55,57,90],[12,32,57,67,80,82]
+];
+
+// Şans Topu son çekilişler
+const sansDraws = [
+  {nums:[8,18,27,28,31],plus:12},{nums:[2,9,15,18,29],plus:9},{nums:[8,13,26,29,31],plus:13}
+];
+
+// On Numara son çekilişler
+const onDraws = [
+  [1,6,8,9,13,14,18,20,22,28,30,31,37,42,43,44,46,50,60,63,72,79],
+  [4,7,8,12,18,19,22,25,29,34,35,38,39,42,43,46,49,61,64,65,68,71],
+  [1,5,11,13,16,17,24,28,31,39,41,46,50,52,55,62,66,70,72,77,79,80],
+  [8,12,14,16,18,21,22,23,29,36,43,44,46,47,48,50,55,59,61,69,71,78],
+  [6,9,18,23,28,32,35,36,42,45,46,47,52,54,55,56,61,68,70,73,78,79]
+];
+
+// Frekans hesapla
+function calcFreq(draws, max) {
+  const f = {};
+  for(let i=1;i<=max;i++) f[i]=0;
+  draws.flat().forEach(n => f[n]++);
+  return f;
+}
+
+const sayisalFreq = calcFreq(sayisalDraws, 90);
+const onFreq = calcFreq(onDraws, 80);
+const sansFreq = {};
+for(let i=1;i<=34;i++) sansFreq[i]=0;
+sansDraws.forEach(d => d.nums.forEach(n => sansFreq[n]++));
+const sansPlusFreq = {};
+for(let i=1;i<=14;i++) sansPlusFreq[i]=0;
+sansDraws.forEach(d => sansPlusFreq[d.plus]++);
+
+// ============ DURUM ============
+let currentGame = 'sayisal';
+let currentStrat = 'auto';
+let totalGenerated = 0;
+
+// ============ OYUN SEÇİMİ ============
+function selectGame(game) {
+  currentGame = game;
+  document.querySelectorAll('.game-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.game-btn[data-game="${game}"]`).classList.add('active');
+  
+  const info = {
+    sayisal: { name:'Çılgın Sayısal Loto', detail:'1-90 arası 6 sayı + Joker', tag:'Pzt-Çar-Cmt 21:30', tagColor:'rgba(59,130,246,.1)', tagText:'#93c5fd' },
+    sans: { name:'Şans Topu', detail:'1-34 arası 5 sayı + 1-14 Şans Topu', tag:'Çar-Paz 21:15', tagColor:'rgba(16,185,129,.1)', tagText:'#6ee7b7' },
+    on: { name:'On Numara', detail:'1-80 arası 10 sayı (22 çekilir)', tag:'Pzt-Cum 20:00', tagColor:'rgba(6,182,212,.1)', tagText:'#67e8f9' }
+  };
+  const i = info[game];
+  document.getElementById('info-name').textContent = i.name;
+  document.getElementById('info-detail').textContent = i.detail;
+  document.getElementById('info-tag').innerHTML = `<span class="tag" style="background:${i.tagColor};color:${i.tagText}">${i.tag}</span>`;
+}
+
+function selectStrat(strat) {
+  currentStrat = strat;
+  document.querySelectorAll('.strat-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.strat-btn[data-strat="${strat}"]`).classList.add('active');
+}
+
+// ============ YARDIMCI FONKSİYONLAR ============
+function shuffle(arr) {
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function pickRandom(arr, count) {
+  return shuffle(arr).slice(0, count).sort((a,b) => a-b);
+}
+
+function getHot(freq, topN) {
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,topN).map(([n])=>parseInt(n));
+}
+
+function getCold(freq) {
+  const maxCount = Math.max(...Object.values(freq));
+  return Object.entries(freq).sort((a,b)=>a[1]-b[1]).map(([n])=>parseInt(n));
+}
+
+function getBalanced(max, count) {
+  // Her dilimden eşit seç
+  const step = Math.floor(max / count);
+  const result = [];
+  for(let i=0;i<count;i++){
+    const lo = i*step+1;
+    const hi = Math.min((i+1)*step, max);
+    result.push(lo + Math.floor(Math.random()*(hi-lo+1)));
+  }
+  return result.sort((a,b)=>a-b);
+}
+
+// ============ KOLON ÜRETİCİLER ============
+
+function genSayisal(strat) {
+  const max=90, count=6;
+  const hot = getHot(sayisalFreq, 20);
+  const cold = getCold(sayisalFreq).slice(0,30);
+  const all = Array.from({length:max},(_,i)=>i+1);
+  let nums, label;
+  
+  switch(strat) {
+    case 'hot':
+      nums = pickRandom(hot, count);
+      label = 'Sıcak';
+      break;
+    case 'cold':
+      nums = pickRandom(cold, count);
+      label = 'Soğuk';
+      break;
+    case 'balanced':
+      nums = getBalanced(max, count);
+      label = 'Dengeli';
+      break;
+    case 'random':
+      nums = pickRandom(all, count);
+      label = 'Rastgele';
+      break;
+    default: // auto - her kolonda farklı mix
+      const strategies = ['hot','cold','balanced'];
+      const pick = strategies[Math.floor(Math.random()*strategies.length)];
+      if(pick==='hot'){ const pool=[...hot,...pickRandom(all,10)]; nums=pickRandom([...new Set(pool)],count); label='Karma-Sıcak'; }
+      else if(pick==='cold'){ const pool=[...cold.slice(0,15),...pickRandom(all,10)]; nums=pickRandom([...new Set(pool)],count); label='Karma-Soğuk'; }
+      else { nums=getBalanced(max,count); label='Karma-Dengeli'; }
+  }
+  
+  // Tek/çift denge kontrolü
+  const odds = nums.filter(n=>n%2!==0).length;
+  if(odds===0||odds===6) {
+    // Dengesizse 1 sayıyı değiştir
+    const replaceIdx = Math.floor(Math.random()*count);
+    let newNum;
+    do { newNum = 1+Math.floor(Math.random()*max); } while(nums.includes(newNum));
+    nums[replaceIdx] = newNum;
+    nums.sort((a,b)=>a-b);
+  }
+  
+  return { nums, label, joker: 1+Math.floor(Math.random()*90) };
+}
+
+function genSans(strat) {
+  const max=34, count=5, plusMax=14;
+  const hot = getHot(sansFreq, 15);
+  const cold = getCold(sansFreq).slice(0,15);
+  const all = Array.from({length:max},(_,i)=>i+1);
+  let nums, label;
+  
+  switch(strat) {
+    case 'hot':
+      nums = pickRandom(hot, count);
+      label = 'Sıcak';
+      break;
+    case 'cold':
+      nums = pickRandom(cold, count);
+      label = 'Soğuk';
+      break;
+    case 'balanced':
+      nums = getBalanced(max, count);
+      label = 'Dengeli';
+      break;
+    case 'random':
+      nums = pickRandom(all, count);
+      label = 'Rastgele';
+      break;
+    default:
+      const pool = [...pickRandom(hot,3),...pickRandom(cold,3)];
+      nums = pickRandom([...new Set(pool)],count);
+      label = 'Karma';
+  }
+  
+  const plus = 1+Math.floor(Math.random()*plusMax);
+  return { nums, label, plus };
+}
+
+function genOn(strat) {
+  const max=80, count=10;
+  const hot = getHot(onFreq, 30);
+  const cold = getCold(onFreq).slice(0,30);
+  const all = Array.from({length:max},(_,i)=>i+1);
+  let nums, label;
+  
+  switch(strat) {
+    case 'hot':
+      nums = pickRandom(hot, count);
+      label = 'Sıcak';
+      break;
+    case 'cold':
+      nums = pickRandom(cold, count);
+      label = 'Soğuk';
+      break;
+    case 'balanced':
+      nums = getBalanced(max, count);
+      label = 'Dengeli';
+      break;
+    case 'random':
+      nums = pickRandom(all, count);
+      label = 'Rastgele';
+      break;
+    default:
+      const pool = [...pickRandom(hot,6),...pickRandom(cold,6)];
+      nums = pickRandom([...new Set(pool)].length>=count ? [...new Set(pool)] : [...new Set(pool),...pickRandom(all,5)], count);
+      label = 'Karma';
+  }
+  
+  return { nums, label };
+}
+
+// ============ ANA ÜRETİCİ ============
+function generate() {
+  const resultsEl = document.getElementById('results');
+  
+  // 3 kolon üret
+  const kolonlar = [];
+  for(let i=0;i<3;i++){
+    let strat = currentStrat;
+    if(strat==='auto') strat='auto'; // Her kolon farklı karışım
+    
+    if(currentGame==='sayisal') kolonlar.push(genSayisal(strat));
+    else if(currentGame==='sans') kolonlar.push(genSans(strat));
+    else kolonlar.push(genOn(strat));
+  }
+  
+  totalGenerated += 3;
+  
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  
+  const stratNames = {auto:'Otomatik Karma',hot:'Sıcak Sayılar',cold:'Soğuk Sayılar',balanced:'Dengeli Dağılım',random:'Tam Rastgele'};
+  const stratColors = {auto:'rgba(245,158,11,.1);color:#fcd34d',hot:'rgba(239,68,68,.1);color:#fca5a5',cold:'rgba(59,130,246,.1);color:#93c5fd',balanced:'rgba(16,185,129,.1);color:#6ee7b7',random:'rgba(139,92,246,.1);color:#c4b5fd'};
+  
+  let html = `<div class="result-batch">`;
+  html += `<div class="batch-header">`;
+  html += `<span class="batch-time">${timeStr}</span>`;
+  html += `<span class="batch-strat" style="background:${stratColors[currentStrat]}">${stratNames[currentStrat]}</span>`;
+  html += `</div>`;
+  
+  kolonlar.forEach((k, idx) => {
+    html += `<div class="kolon-card" data-game="${currentGame}">`;
+    html += `<div class="kolon-head">`;
+    html += `<span class="kolon-num">Kolon ${idx+1}</span>`;
+    
+    const typeColors = {
+      'Sıcak':'background:rgba(239,68,68,.1);color:#fca5a5',
+      'Soğuk':'background:rgba(59,130,246,.1);color:#93c5fd',
+      'Dengeli':'background:rgba(16,185,129,.1);color:#6ee7b7',
+      'Rastgele':'background:rgba(139,92,246,.1);color:#c4b5fd',
+      'Karma':'background:rgba(245,158,11,.1);color:#fcd34d',
+      'Karma-Sıcak':'background:rgba(239,68,68,.08);color:#fca5a5',
+      'Karma-Soğuk':'background:rgba(59,130,246,.08);color:#93c5fd',
+      'Karma-Dengeli':'background:rgba(16,185,129,.08);color:#6ee7b7',
+    };
+    html += `<span class="kolon-type" style="${typeColors[k.label]||'background:rgba(255,255,255,.05);color:var(--text2)'}">${k.label}</span>`;
+    html += `</div>`;
+    
+    html += `<div class="balls">`;
+    
+    if(currentGame==='sayisal'){
+      k.nums.forEach(n => html+=`<div class="ball main">${n}</div>`);
+      html+=`<span class="ball-sep">J</span><div class="ball joker">${k.joker}</div>`;
+    } else if(currentGame==='sans'){
+      k.nums.forEach(n => html+=`<div class="ball sans-main">${n}</div>`);
+      html+=`<span class="ball-sep">+</span><div class="ball sans-plus">${k.plus}</div>`;
+    } else {
+      k.nums.forEach(n => html+=`<div class="ball on-num">${n}</div>`);
+    }
+    
+    html += `</div></div>`;
+  });
+  
+  html += `</div>`;
+  
+  resultsEl.insertAdjacentHTML('afterbegin', html);
+  
+  document.getElementById('counter').innerHTML = `Toplam üretilen: <strong>${totalGenerated}</strong> kolon`;
+  
+  // Buton animasyonu
+  const btn = document.querySelector('.gen-btn');
+  btn.style.transform = 'scale(0.95)';
+  setTimeout(()=> btn.style.transform = '', 150);
+}
+
+// İlk yükleme - 1 set üret
+generate();
+</script>
+</body>
+</html>
