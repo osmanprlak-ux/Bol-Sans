@@ -78,7 +78,19 @@
                     </div>
 
                     <div class="border-t pt-4 mt-4">
-                        <h3 class="text-sm font-bold text-gray-700 mb-2">Ek Ödemeler (Opsiyonel)</h3>
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Mesai ve Ek Kazançlar</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-4 bg-gray-50 p-3 rounded border border-gray-200">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" title="Saatlik ücretin 1.5 katı üzerinden hesaplanır.">%50 Fazla Mesai (Saat)</label>
+                                <input type="number" id="overtimeHours" class="w-full border-gray-300 border rounded p-1.5 focus:ring-primary focus:border-primary" placeholder="0" value="0">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-700 mb-1" title="Tatil gününde fazladan 1 yevmiye hesaplanır.">Resmi Tatil Çalışması (Gün)</label>
+                                <input type="number" id="holidayDays" class="w-full border-gray-300 border rounded p-1.5 focus:ring-primary focus:border-primary" placeholder="0" value="0">
+                            </div>
+                        </div>
+
+                        <h3 class="text-sm font-bold text-gray-700 mb-2">Diğer Ek Ödemeler (Opsiyonel)</h3>
                         <div class="space-y-3" id="additionalPayments">
                             <div class="flex gap-2 items-end">
                                 <div class="flex-1">
@@ -387,6 +399,10 @@
             const monthName = document.getElementById('calcMonth').options[document.getElementById('calcMonth').selectedIndex].text;
             document.getElementById('lblPeriod').textContent = `2025 ${monthName}`;
 
+            // Mesai Verilerini Oku
+            const overtimeHours = parseFloat(document.getElementById('overtimeHours').value) || 0;
+            const holidayDays = parseFloat(document.getElementById('holidayDays').value) || 0;
+
             // Ek Ödemeleri Oku
             let additionalTotalInput = 0;
             const additions = [];
@@ -404,21 +420,32 @@
             let finalRes;
             let finalBaseGross = 0;
             let finalAdditionsGross = [];
+            let calculatedOvertimeGross = 0;
+            let calculatedHolidayGross = 0;
 
             if (calcType === 'brut2net') {
                 // Brüt'ten Net'e
                 finalBaseGross = baseInput;
-                const totalGross = baseInput + additionalTotalInput;
+
+                // Mesai hesapla (Brüt ana maaş üzerinden)
+                calculatedOvertimeGross = (finalBaseGross / 225) * 1.5 * overtimeHours;
+                calculatedHolidayGross = (finalBaseGross / 30) * holidayDays;
+
+                const totalGross = finalBaseGross + additionalTotalInput + calculatedOvertimeGross + calculatedHolidayGross;
                 finalRes = calculatePayrollMath(totalGross, cumulativeBase, monthIndex, p);
 
                 // Ek ödemeler aynen brüt kabul edildi
+                if (calculatedOvertimeGross > 0) finalAdditionsGross.push({ desc: 'Fazla Mesai Ücreti', amount: calculatedOvertimeGross });
+                if (calculatedHolidayGross > 0) finalAdditionsGross.push({ desc: 'Resmi Tatil Ücreti', amount: calculatedHolidayGross });
                 additions.forEach(a => finalAdditionsGross.push({ desc: a.desc, amount: a.amount }));
 
             } else {
                 // Net'ten Brüt'e (Binary Search Yaklaşımı)
+                // 1. ADIM: Sadece kullanıcının girdiği "Net Ana Maaş" ve "Net Ek Ödemeler" için
+                // eşdeğer bir "Temel Brüt Maaş" bul (Mesaileri hariç tutarak).
                 const targetNet = baseInput + additionalTotalInput;
                 let low = targetNet;
-                let high = targetNet * 3; // Brüt genellikle netin 1.5-2 katı civarıdır
+                let high = targetNet * 3;
                 let bestGross = targetNet;
 
                 for (let i = 0; i < 50; i++) { // 50 iterasyon yeterli hassasiyeti sağlar
@@ -436,15 +463,28 @@
                     bestGross = mid;
                 }
 
-                finalRes = calculatePayrollMath(bestGross, cumulativeBase, monthIndex, p);
-
-                // Brüt değerleri oransal olarak dağıt
+                // 2. ADIM: Bulunan temel brüt üzerinden finalBaseGross'u ayrıştır ve mesaileri hesapla
                 let totalInputNet = targetNet;
                 if(totalInputNet > 0) {
                     finalBaseGross = (baseInput / totalInputNet) * bestGross;
+
+                    calculatedOvertimeGross = (finalBaseGross / 225) * 1.5 * overtimeHours;
+                    calculatedHolidayGross = (finalBaseGross / 30) * holidayDays;
+
+                    // Toplam nihai brüt
+                    let grandTotalGross = bestGross + calculatedOvertimeGross + calculatedHolidayGross;
+
+                    // Bu yeni toplam brüt üzerinden son nihai bordroyu çıkar
+                    finalRes = calculatePayrollMath(grandTotalGross, cumulativeBase, monthIndex, p);
+
+                    if (calculatedOvertimeGross > 0) finalAdditionsGross.push({ desc: 'Fazla Mesai Ücreti', amount: calculatedOvertimeGross });
+                    if (calculatedHolidayGross > 0) finalAdditionsGross.push({ desc: 'Resmi Tatil Ücreti', amount: calculatedHolidayGross });
+
                     additions.forEach(a => {
                         finalAdditionsGross.push({ desc: a.desc, amount: (a.amount / totalInputNet) * bestGross });
                     });
+                } else {
+                    finalRes = calculatePayrollMath(bestGross, cumulativeBase, monthIndex, p);
                 }
             }
 
@@ -527,7 +567,7 @@
         });
 
     </script>
-    
+
     <style>
         @media print {
             body { background: white; }
