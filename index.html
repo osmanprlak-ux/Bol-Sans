@@ -42,14 +42,14 @@
                 <form id="payrollForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Hesaplama Yönü</label>
-                        <select id="calcType" class="w-full border-gray-300 border rounded p-2 focus:ring-primary focus:border-primary">
+                        <select id="calcType" class="w-full border-gray-300 border rounded p-2 focus:ring-primary focus:border-primary" onchange="document.getElementById('lblBaseSalary').textContent = this.value === 'net2brut' ? 'İstenen Net Maaş (TL)' : 'Ana Maaş Brüt (TL)'; document.getElementById('lblAddPay').textContent = this.value === 'net2brut' ? 'Tutar (Net)' : 'Tutar (Brüt)'; Array.from(document.querySelectorAll('.lbl-add-pay')).forEach(el => el.textContent = this.value === 'net2brut' ? 'Tutar (Net)' : 'Tutar (Brüt)');">
                             <option value="brut2net">Brütten Nete</option>
-                            <option value="net2brut">Netten Brüte (Yakında)</option>
+                            <option value="net2brut">Netten Brüte</option>
                         </select>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Ana Maaş (TL)</label>
+                        <label id="lblBaseSalary" class="block text-sm font-medium text-gray-700 mb-1">Ana Maaş Brüt (TL)</label>
                         <input type="number" id="baseSalary" class="w-full border-gray-300 border rounded p-2 focus:ring-primary focus:border-primary" placeholder="Örn: 30000" required>
                     </div>
 
@@ -86,7 +86,7 @@
                                     <input type="text" class="add-pay-desc w-full border-gray-300 border rounded p-1.5 text-sm" placeholder="Açıklama">
                                 </div>
                                 <div class="flex-1">
-                                    <label class="block text-xs text-gray-500">Tutar (Brüt)</label>
+                                    <label id="lblAddPay" class="block text-xs text-gray-500 lbl-add-pay">Tutar (Brüt)</label>
                                     <input type="number" class="add-pay-amount w-full border-gray-300 border rounded p-1.5 text-sm" placeholder="0">
                                 </div>
                             </div>
@@ -316,8 +316,55 @@
             return taxAmount;
         }
 
-        // Ana Hesaplama (Brütten Nete)
-        function calculateBrut2Net() {
+        // Çekirdek Bordro Matematiği
+        function calculatePayrollMath(totalGross, cumulativeBase, monthIndex, p) {
+            // SGK Hesaplamaları
+            let sgkBase = Math.min(totalGross, p.sgkCeiling);
+            let sgkWorker = sgkBase * p.sgkW;
+            let unempWorker = sgkBase * p.unempW;
+            let totalWorkerDeductionsSGK = sgkWorker + unempWorker;
+
+            let sgkEmployer = sgkBase * p.sgkE;
+            let unempEmployer = sgkBase * p.unempE;
+            let totalEmployerSGK = sgkEmployer + unempEmployer;
+
+            // Vergi Hesaplamaları
+            let incomeTaxBase = totalGross - totalWorkerDeductionsSGK;
+            let stampTaxBase = totalGross;
+
+            let calculatedIncomeTax = calculateIncomeTax(incomeTaxBase, cumulativeBase, p);
+            let calculatedStampTax = stampTaxBase * p.stampTaxRate;
+
+            // Asgari Ücret İstisnası
+            let minWageSGKBase = p.minWage;
+            let minWageSGKWorker = minWageSGKBase * p.sgkW;
+            let minWageUnempWorker = minWageSGKBase * p.unempW;
+            let minWageIncomeTaxBase = p.minWage - (minWageSGKWorker + minWageUnempWorker);
+
+            let minWageCumulative = minWageIncomeTaxBase * (parseInt(monthIndex) - 1);
+            let exemptIncomeTax = calculateIncomeTax(minWageIncomeTaxBase, minWageCumulative, p);
+            let exemptStampTax = p.minWage * p.stampTaxRate;
+
+            let finalIncomeTax = Math.max(0, calculatedIncomeTax - exemptIncomeTax);
+            let finalStampTax = Math.max(0, calculatedStampTax - exemptStampTax);
+
+            let totalWorkerDeductions = totalWorkerDeductionsSGK + finalIncomeTax + finalStampTax;
+            let netSalary = totalGross - totalWorkerDeductions;
+            let employerCost = totalGross + totalEmployerSGK;
+
+            return {
+                totalGross, netSalary, employerCost,
+                sgkBase, sgkWorker, unempWorker, totalWorkerDeductionsSGK,
+                sgkEmployer, unempEmployer, totalEmployerSGK,
+                incomeTaxBase, cumulativeBase,
+                calculatedIncomeTax, exemptIncomeTax, finalIncomeTax,
+                calculatedStampTax, exemptStampTax, finalStampTax,
+                totalWorkerDeductions
+            };
+        }
+
+        // Ana Uygulama Çalıştırıcı
+        function runCalculator() {
             // Parametreleri Oku
             const p = {
                 minWage: parseFloat(document.getElementById('p_minWage').value),
@@ -333,108 +380,113 @@
                 unempE: parseFloat(document.getElementById('p_unempE').value),
             };
 
-            // Form Verilerini Oku
-            const baseSalary = parseFloat(document.getElementById('baseSalary').value) || 0;
+            const calcType = document.getElementById('calcType').value;
+            const baseInput = parseFloat(document.getElementById('baseSalary').value) || 0;
             const cumulativeBase = parseFloat(document.getElementById('cumulativeBase').value) || 0;
             const monthIndex = document.getElementById('calcMonth').value;
             const monthName = document.getElementById('calcMonth').options[document.getElementById('calcMonth').selectedIndex].text;
             document.getElementById('lblPeriod').textContent = `2025 ${monthName}`;
 
-            // Ek Ödemeler
-            let additionalTotal = 0;
-            let earningsHtml = createTableRow('Aylık Brüt Ücret', baseSalary);
+            // Ek Ödemeleri Oku
+            let additionalTotalInput = 0;
+            const additions = [];
             const addDescInputs = document.querySelectorAll('.add-pay-desc');
             const addAmountInputs = document.querySelectorAll('.add-pay-amount');
-
             for (let i = 0; i < addDescInputs.length; i++) {
                 const desc = addDescInputs[i].value || 'Ek Ödeme ' + (i + 1);
                 const amount = parseFloat(addAmountInputs[i].value) || 0;
                 if (amount > 0) {
-                    additionalTotal += amount;
-                    earningsHtml += createTableRow(desc, amount);
+                    additionalTotalInput += amount;
+                    additions.push({ desc, amount });
                 }
             }
 
-            const totalGross = baseSalary + additionalTotal;
-            earningsHtml += createTableRow('TOPLAM KAZANÇLAR (BRÜT)', totalGross, true);
+            let finalRes;
+            let finalBaseGross = 0;
+            let finalAdditionsGross = [];
+
+            if (calcType === 'brut2net') {
+                // Brüt'ten Net'e
+                finalBaseGross = baseInput;
+                const totalGross = baseInput + additionalTotalInput;
+                finalRes = calculatePayrollMath(totalGross, cumulativeBase, monthIndex, p);
+
+                // Ek ödemeler aynen brüt kabul edildi
+                additions.forEach(a => finalAdditionsGross.push({ desc: a.desc, amount: a.amount }));
+
+            } else {
+                // Net'ten Brüt'e (Binary Search Yaklaşımı)
+                const targetNet = baseInput + additionalTotalInput;
+                let low = targetNet;
+                let high = targetNet * 3; // Brüt genellikle netin 1.5-2 katı civarıdır
+                let bestGross = targetNet;
+
+                for (let i = 0; i < 50; i++) { // 50 iterasyon yeterli hassasiyeti sağlar
+                    let mid = (low + high) / 2;
+                    let testRes = calculatePayrollMath(mid, cumulativeBase, monthIndex, p);
+                    if (Math.abs(testRes.netSalary - targetNet) < 0.01) {
+                        bestGross = mid;
+                        break;
+                    }
+                    if (testRes.netSalary < targetNet) {
+                        low = mid;
+                    } else {
+                        high = mid;
+                    }
+                    bestGross = mid;
+                }
+
+                finalRes = calculatePayrollMath(bestGross, cumulativeBase, monthIndex, p);
+
+                // Brüt değerleri oransal olarak dağıt
+                let totalInputNet = targetNet;
+                if(totalInputNet > 0) {
+                    finalBaseGross = (baseInput / totalInputNet) * bestGross;
+                    additions.forEach(a => {
+                        finalAdditionsGross.push({ desc: a.desc, amount: (a.amount / totalInputNet) * bestGross });
+                    });
+                }
+            }
+
+            // Arayüzü Güncelle
+            let earningsHtml = createTableRow('Aylık Brüt Ücret', finalBaseGross);
+            finalAdditionsGross.forEach(a => {
+                earningsHtml += createTableRow(a.desc, a.amount);
+            });
+            earningsHtml += createTableRow('TOPLAM KAZANÇLAR (BRÜT)', finalRes.totalGross, true);
             document.getElementById('tblEarnings').innerHTML = earningsHtml;
 
-            // SGK Hesaplamaları
-            let sgkBase = Math.min(totalGross, p.sgkCeiling);
-            let sgkWorker = sgkBase * p.sgkW;
-            let unempWorker = sgkBase * p.unempW;
-            let totalWorkerDeductionsSGK = sgkWorker + unempWorker;
+            document.getElementById('resGross').textContent = formatMoney(finalRes.totalGross);
+            document.getElementById('resNet').textContent = formatMoney(finalRes.netSalary);
+            document.getElementById('resCost').textContent = formatMoney(finalRes.employerCost);
 
-            let sgkEmployer = sgkBase * p.sgkE;
-            let unempEmployer = sgkBase * p.unempE;
-            let totalEmployerSGK = sgkEmployer + unempEmployer;
-
-            // Vergi Hesaplamaları
-            let incomeTaxBase = totalGross - totalWorkerDeductionsSGK; // Gelir Vergisi Matrahı
-            let stampTaxBase = totalGross; // Damga Vergisi Matrahı (Tüm brüt)
-
-            // Normal Vergi
-            let calculatedIncomeTax = calculateIncomeTax(incomeTaxBase, cumulativeBase, p);
-            let calculatedStampTax = stampTaxBase * p.stampTaxRate;
-
-            // Asgari Ücret İstisnası Hesaplama (Aylık asgari ücret üzerinden)
-            let minWageSGKBase = p.minWage;
-            let minWageSGKWorker = minWageSGKBase * p.sgkW;
-            let minWageUnempWorker = minWageSGKBase * p.unempW;
-            let minWageIncomeTaxBase = p.minWage - (minWageSGKWorker + minWageUnempWorker);
-
-            // Asgari ücretin aylık kümülatif hesabı (basitleştirilmiş, sadece istisna sınırı)
-            let minWageCumulative = minWageIncomeTaxBase * (parseInt(monthIndex) - 1);
-            let exemptIncomeTax = calculateIncomeTax(minWageIncomeTaxBase, minWageCumulative, p);
-            let exemptStampTax = p.minWage * p.stampTaxRate;
-
-            // Ödenecek Vergiler (İstisna düşülmüş hali, sıfırdan küçük olamaz)
-            let finalIncomeTax = Math.max(0, calculatedIncomeTax - exemptIncomeTax);
-            let finalStampTax = Math.max(0, calculatedStampTax - exemptStampTax);
-
-            // Net Maaş
-            let totalWorkerDeductions = totalWorkerDeductionsSGK + finalIncomeTax + finalStampTax;
-            let netSalary = totalGross - totalWorkerDeductions;
-
-            // İşveren Maliyeti
-            let employerCost = totalGross + totalEmployerSGK;
-
-            // Sonuçları Ekrana Yazdır
-            document.getElementById('resGross').textContent = formatMoney(totalGross);
-            document.getElementById('resNet').textContent = formatMoney(netSalary);
-            document.getElementById('resCost').textContent = formatMoney(employerCost);
-
-            // Kesintiler Tablosu
             let deductionsHtml = '';
-            deductionsHtml += createTableRow('SGK İşçi Payı (%14)', sgkWorker);
-            deductionsHtml += createTableRow('İşsizlik İşçi Payı (%1)', unempWorker);
-            deductionsHtml += createTableRow('Gelir Vergisi', finalIncomeTax);
-            if (exemptIncomeTax > 0) {
-                deductionsHtml += `<tr><td colspan="2" class="text-xs text-green-600 px-2 pb-1 italic">* ${formatMoney(exemptIncomeTax)} Asgari Ücret İstisnası uygulanmıştır.</td></tr>`;
+            deductionsHtml += createTableRow('SGK İşçi Payı (%14)', finalRes.sgkWorker);
+            deductionsHtml += createTableRow('İşsizlik İşçi Payı (%1)', finalRes.unempWorker);
+            deductionsHtml += createTableRow('Gelir Vergisi', finalRes.finalIncomeTax);
+            if (finalRes.exemptIncomeTax > 0) {
+                deductionsHtml += `<tr><td colspan="2" class="text-xs text-green-600 px-2 pb-1 italic">* ${formatMoney(finalRes.exemptIncomeTax)} Asgari Ücret İstisnası uygulanmıştır.</td></tr>`;
             }
-            deductionsHtml += createTableRow('Damga Vergisi', finalStampTax);
-            if (exemptStampTax > 0) {
-                deductionsHtml += `<tr><td colspan="2" class="text-xs text-green-600 px-2 pb-1 italic">* ${formatMoney(exemptStampTax)} Asgari Ücret İstisnası uygulanmıştır.</td></tr>`;
+            deductionsHtml += createTableRow('Damga Vergisi', finalRes.finalStampTax);
+            if (finalRes.exemptStampTax > 0) {
+                deductionsHtml += `<tr><td colspan="2" class="text-xs text-green-600 px-2 pb-1 italic">* ${formatMoney(finalRes.exemptStampTax)} Asgari Ücret İstisnası uygulanmıştır.</td></tr>`;
             }
-            deductionsHtml += createTableRow('TOPLAM KESİNTİLER', totalWorkerDeductions, true);
+            deductionsHtml += createTableRow('TOPLAM KESİNTİLER', finalRes.totalWorkerDeductions, true);
             document.getElementById('tblDeductions').innerHTML = deductionsHtml;
 
-            // Matrahlar Tablosu
             let infoHtml = '';
-            infoHtml += createTableRow('SGK Matrahı', sgkBase);
-            infoHtml += createTableRow('Gelir Vergisi Matrahı (Aylık)', incomeTaxBase);
-            infoHtml += createTableRow('Kümülatif Vergi Matrahı', cumulativeBase + incomeTaxBase, true);
+            infoHtml += createTableRow('SGK Matrahı', finalRes.sgkBase);
+            infoHtml += createTableRow('Gelir Vergisi Matrahı (Aylık)', finalRes.incomeTaxBase);
+            infoHtml += createTableRow('Kümülatif Vergi Matrahı', finalRes.cumulativeBase + finalRes.incomeTaxBase, true);
             document.getElementById('tblInfo').innerHTML = infoHtml;
 
-            // İşveren Maliyeti Tablosu
             let employerHtml = '';
-            employerHtml += createTableRow('Brüt Ücret', totalGross);
-            employerHtml += createTableRow(`SGK İşveren Payı (%${(p.sgkE*100).toFixed(1)})`, sgkEmployer);
-            employerHtml += createTableRow(`İşsizlik İşveren Payı (%${(p.unempE*100).toFixed(1)})`, unempEmployer);
-            employerHtml += createTableRow('TOPLAM MALİYET', employerCost, true);
+            employerHtml += createTableRow('Brüt Ücret', finalRes.totalGross);
+            employerHtml += createTableRow(`SGK İşveren Payı (%${(p.sgkE*100).toFixed(1)})`, finalRes.sgkEmployer);
+            employerHtml += createTableRow(`İşsizlik İşveren Payı (%${(p.unempE*100).toFixed(1)})`, finalRes.unempEmployer);
+            employerHtml += createTableRow('TOPLAM MALİYET', finalRes.employerCost, true);
             document.getElementById('tblEmployer').innerHTML = employerHtml;
 
-            // Görünüm Değişimi
             emptyState.classList.add('hidden');
             resultState.classList.remove('hidden');
             actionButtons.classList.remove('hidden');
@@ -443,15 +495,7 @@
         // Form Gönderme Olayı
         payrollForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const calcType = document.getElementById('calcType').value;
-
-            if (calcType === 'net2brut') {
-                alert("Net'ten Brüte hesaplama özelliği şu anda geliştirme aşamasındadır. Lütfen Brütten Nete hesaplama yapınız.");
-                document.getElementById('calcType').value = 'brut2net';
-                return;
-            }
-
-            calculateBrut2Net();
+            runCalculator();
         });
 
         // Yazdırma İşlevi
